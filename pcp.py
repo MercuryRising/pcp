@@ -117,29 +117,26 @@ class pcp():
         """
 
         # Python 2.6+
-        try:
+        if sys.version_info.minor > 6:
             import multiprocessing
             return multiprocessing.cpu_count()
-        except (ImportError, NotImplementedError):
-            pass
 
         # POSIX
         try:
+            # this returns int on my computer (Linux)
             self.cores = int(os.sysconf('SC_NPROCESSORS_ONLN'))
 
             if self.cores > 0:
                 return self.cores
+
         except (AttributeError, ValueError):
             pass
 
-        # Windows
-        try:
-            self.cores = int(os.environ['NUMBER_OF_PROCESSORS'])
-
-            if self.cores > 0:
-                return self.cores
-        except (KeyError, ValueError):
-            pass
+        # You can use get on a dictionary to avoid key errors and set a 'default' value
+        # If this is your last check before failing, default to 1 (as you obviously need one, or raise an error)
+        self.cores = int(os.environ.get('NUMBER_OF_PROCESSORS', 1))
+        return self.cores
+        
 
     def check_dir(self, dir_path):
         """
@@ -176,13 +173,14 @@ class pcp():
         """
         Create threads and copy
         """
-
+        startTime = time.time()
+    
         self.cores = self.get_num_cores()
         if cpus == 0:
             cpus = self.cores / 3
         elif cpus > self.cores:
-            print "You can set a max of {0} CPU's to use.".format(self.cores)
-            exit()
+            cpus = self.cores / 3
+            print "Too many cores selected, setting to {0} cores.".format(cpus)
 
         print "Starting the copy with {0} threads.".format(cpus)
 
@@ -192,6 +190,12 @@ class pcp():
             self.worker.start()
 
         queue.join()
+
+        # consider adding up the total file size being transferred and comparing the transfer rates
+        # depending on the number of cores you use - you may find something interesting....
+        timeDelta = time.time() - startTime
+        print "Copy job completed in {0} seconds".format(timeDelta)
+
 
 if __name__ == '__main__':
     pcp = pcp()
